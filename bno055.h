@@ -259,6 +259,10 @@ void bno055_setOperationModeNDOF();
 void bno055_enableExternalCrystal();
 void bno055_disableExternalCrystal();
 void bno055_setup();
+uint8_t bno055_getInterruptEnable();
+void bno055_setInterruptEnable(uint8_t byte);
+uint8_t bno055_getInterruptMask();
+void bno055_setInterruptMask(uint8_t mask);
 
 int8_t bno055_getTemp();
 
@@ -277,6 +281,17 @@ bno055_vector_t bno055_getVectorGyroscope();
 bno055_vector_t bno055_getVectorEuler();
 bno055_vector_t bno055_getVectorLinearAccel();
 bno055_vector_t bno055_getVectorGravity();
+
+uint8_t bno055_setInterruptAccelHighGDuration(uint16_t duration_ms);
+uint8_t bno055_setInterruptAccelThresholds(
+  double anyMotion_g,
+  double highG_g,
+  double noSlowMotion_g
+);
+uint8_t bno055_setInterruptNoSlowMotion(
+  uint8_t noSlowMotion,
+  uint16_t duration_s
+);
 
 #ifdef __cplusplus
   }

@@ -6,6 +6,7 @@ uint16_t tempScale = 1;
 uint16_t angularRateScale = 16;
 uint16_t eulerScale = 16;
 uint16_t magScale = 16;
+static uint8_t accelerometerRange = 4;
 
 void bno055_setPage(uint8_t page) { bno055_writeData(BNO055_PAGE_ID, page); }
 
@@ -43,6 +44,37 @@ void bno055_disableExternalCrystal() { bno055_setExternalCrystalUse(false); }
 void bno055_reset() {
   bno055_writeData(BNO055_SYS_TRIGGER, 0x20);
   bno055_delay(700);
+}
+
+
+uint8_t bno055_getInterruptEnable() {
+  uint8_t byte;
+  bno055_setPage(1);
+  bno055_readData(BNO055_INT_EN, &byte, 1);
+  return byte;
+}
+
+/* Enable/disable interrupts.
+ * Chip default value after reset: all interrupts are disabled
+ */
+void bno055_setInterruptEnable(uint8_t byte) {
+  bno055_setPage(1);
+  bno055_writeData(BNO055_INT_EN, byte);
+}
+
+uint8_t bno055_getInterruptMask() {
+  uint8_t mask;
+  bno055_setPage(1);
+  bno055_readData(BNO055_INT_MSK, &mask, 1);
+  return mask;
+}
+
+/* Activate/deactivate pin state change from interrupt.
+ * Chip default value after reset: no interrupt triggers a pin change
+ */
+void bno055_setInterruptMask(uint8_t mask) {
+  bno055_setPage(1);
+  bno055_writeData(BNO055_INT_MSK, mask);
 }
 
 int8_t bno055_getTemp() {
@@ -165,25 +197,40 @@ void bno055_setCalibrationData(bno055_calibration_data_t calData) {
 }
 
 bno055_vector_t bno055_getVector(uint8_t vec) {
-  bno055_setPage(0);
   uint8_t buffer[6];
-
-  bno055_readData(vec, buffer, 6);
-
+  bno055_vector_t xyz = {.x = 0, .y = 0, .z = 0};
   double scale = 1;
+
+  bno055_setPage(0);
+  bno055_readData(vec, buffer, 6);
 
   if (vec == BNO055_VECTOR_MAGNETOMETER) {
     scale = magScale;
   } else if (vec == BNO055_VECTOR_ACCELEROMETER ||
            vec == BNO055_VECTOR_LINEARACCEL || vec == BNO055_VECTOR_GRAVITY) {
-    scale = accelScale;
+    scale  = accelScale;
   } else if (vec == BNO055_VECTOR_GYROSCOPE) {
     scale = angularRateScale;
   } else if (vec == BNO055_VECTOR_EULER) {
     scale = eulerScale;
   }
+  switch (vec) {
+    case BNO055_VECTOR_MAGNETOMETER:
+      scale = magScale;
+      break;
+    case BNO055_VECTOR_ACCELEROMETER:
+    case BNO055_VECTOR_LINEARACCEL:
+    case BNO055_VECTOR_GRAVITY:
+      scale = accelScale;
+      break;
+    case BNO055_VECTOR_GYROSCOPE:
+      scale = angularRateScale;
+      break;
+    case BNO055_VECTOR_EULER:
+      scale = eulerScale;
+      break;
+  }
 
-  bno055_vector_t xyz = {.x = 0, .y = 0, .z = 0};
   xyz.x = (int16_t)((buffer[1] << 8) | buffer[0]) / scale;
   xyz.y = (int16_t)((buffer[3] << 8) | buffer[2]) / scale;
   xyz.z = (int16_t)((buffer[5] << 8) | buffer[4]) / scale;
@@ -208,4 +255,109 @@ bno055_vector_t bno055_getVectorLinearAccel() {
 }
 bno055_vector_t bno055_getVectorGravity() {
   return bno055_getVector(BNO055_VECTOR_GRAVITY);
+}
+
+
+/* Set duration in ms to trigger high G interrupt.
+ * Chip default value after reset: 32 ms
+ * Return: 0 if success, 1 if duration to short, 2 if duration too long
+ */
+uint8_t bno055_setInterruptAccelHighGDuration(uint16_t duration_ms) {
+  if (duration_ms < 2) { return 1; }
+  if (duration_ms > 512) { return 2; }
+
+  bno055_setPage(1);
+  bno055_writeData(BNO055_ACC_HG_DURATION, (uint8_t) (duration_ms/2 - 1));
+  return 0;
+}
+
+
+/* Set interrupt thresholds.
+ * Chip default values after reset:
+ *   anyMotion:    0x20 => 2 g: 0.078 g  -  4 g: 0.156 g  -  8 g: 0.313 g  -  16 g: 0.625 g
+ *   highG:        0xC0 => 2 g: 1.500 g  -  4 g: 3.000 g  -  8 g: 6.000 g  -  16 g: 12.00 g
+ *   noSlowMotion: 0x01 => 2 g: 0.039 g  -  4 g: 0.078 g  -  8 g: 0.156 g  -  16 g: 0.313 g
+ * Return:
+ *   0 if success
+ *   1 if accelerometer range is not correct
+ */
+uint8_t bno055_setInterruptAccelThresholds(
+      double anyMotion_g,
+      double highG_g,
+      double noSlowMotion_g
+    ) {
+  double scale = 1000;
+
+  switch (accelerometerRange) {
+    case 2:
+      scale /= 3.91;
+      break;
+    case 4:
+      scale /= 7.81;
+      break;
+    case 8:
+      scale /=  15.63;
+      break;
+    case 16:
+      scale /=  31.25;
+      break;
+    default:
+      return 1;
+  }
+
+  bno055_setPage(1);
+  bno055_writeData(BNO055_ACC_AM_THRES, (uint8_t) (anyMotion_g * scale));
+  bno055_writeData(BNO055_ACC_HG_THRESH, (uint8_t) (highG_g * scale / 2));
+  bno055_writeData(BNO055_ACC_NM_THRESH, (uint8_t) (noSlowMotion_g * scale));
+  return 0;
+}
+
+
+/* Set slow motion interrupt parameters, duration in seconds.
+ * noSlowMotion = 0 => Slow motion
+ * noSlowMotion = 1 => No motion
+ * Chip default values after reset:
+ *   No motion enabled (slow motion disabled)
+ *   Triggers after 6 seconds
+ * Return:
+ *   0 if success
+ *   1 if parameter is too low in no motion mode (<1 second)
+ *   2 if parameter is too high in no motion mode (>=337)
+ *   3 if parameter is too high in slow motion (> 63 values)
+ *   4 if noSlowMotion > 1
+ * /!\ [17-19] seconds are changed to 16 due to coding limitations
+ * /!\ [81-87] seconds are changed to 80 due to coding limiations
+ */
+uint8_t bno055_setInterruptNoSlowMotion(
+      uint8_t noSlowMotion,
+      uint16_t parameter
+    ) {
+  uint8_t byte = 0;
+
+  if (noSlowMotion == 0) {
+    if (parameter < 1) {
+      return 1;
+    } else if (parameter < 20) {
+      byte = ((parameter - 1) & 0x0F) << 1;
+    } else if (parameter < 88) {
+      byte = (((parameter - 20)/4) & 0x0F) << 1;
+      byte |= 0x20;
+    } else if (parameter < 337) {
+      byte = ((parameter - 88)/8) << 1;
+      byte |= 0x40;
+    } else {
+      return 2;
+    }
+    byte |= 0x01;
+  } else if (noSlowMotion == 1) {
+    if (parameter > 63) { return 3; }
+    byte = parameter << 1;
+  } else {
+    return 4;
+  }
+
+  bno055_setPage(1);
+  bno055_writeData(BNO055_ACC_NM_SET, byte);
+
+  return 0;
 }
