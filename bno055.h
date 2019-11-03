@@ -282,14 +282,22 @@ bno055_vector_t bno055_getVectorEuler();
 bno055_vector_t bno055_getVectorLinearAccel();
 bno055_vector_t bno055_getVectorGravity();
 
+
+uint8_t bno055_getInterruptEnable();
+void bno055_setInterruptEnable(uint8_t byte);
+uint8_t bno055_getInterruptMask();
+void bno055_setInterruptMask(uint8_t mask);
+uint8_t bno055_getInterruptStatus();
 uint8_t bno055_setInterruptAccelHighGDuration(uint16_t duration_ms);
+void bno055_setInterruptAccelSettings(uint8_t byte);
+void bno055_resetInterruptPin();
 uint8_t bno055_setInterruptAccelThresholds(
   double anyMotion_g,
   double highG_g,
   double noSlowMotion_g
 );
-uint8_t bno055_setInterruptNoSlowMotion(
-  uint8_t noSlowMotion,
+uint8_t bno055_setInterruptNoOrSlowMotion(
+  uint8_t noOrSlowMotion,
   uint16_t duration_s
 );
 

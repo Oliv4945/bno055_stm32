@@ -77,6 +77,14 @@ void bno055_setInterruptMask(uint8_t mask) {
   bno055_writeData(BNO055_INT_MSK, mask);
 }
 
+uint8_t bno055_getInterruptStatus() {
+  uint8_t byte;
+  bno055_setPage(0);
+  bno055_readData(BNO055_INT_STATUS, &byte, 1);
+  bno055_resetInterruptPin();
+  return byte;
+}
+
 int8_t bno055_getTemp() {
   bno055_setPage(0);
   uint8_t t;
@@ -257,6 +265,10 @@ bno055_vector_t bno055_getVectorGravity() {
   return bno055_getVector(BNO055_VECTOR_GRAVITY);
 }
 
+void bno055_setInterruptAccelSettings(uint8_t byte) {
+  bno055_setPage(1);
+  bno055_writeData(BNO055_ACC_INT_SETTINGS, byte);
+}
 
 /* Set duration in ms to trigger high G interrupt.
  * Chip default value after reset: 32 ms
@@ -269,6 +281,12 @@ uint8_t bno055_setInterruptAccelHighGDuration(uint16_t duration_ms) {
   bno055_setPage(1);
   bno055_writeData(BNO055_ACC_HG_DURATION, (uint8_t) (duration_ms/2 - 1));
   return 0;
+}
+
+
+void bno055_resetInterruptPin() {
+  bno055_setPage(0);
+  bno055_writeData(BNO055_SYS_TRIGGER, 0x40);
 }
 
 
@@ -328,32 +346,37 @@ uint8_t bno055_setInterruptAccelThresholds(
  * /!\ [17-19] seconds are changed to 16 due to coding limitations
  * /!\ [81-87] seconds are changed to 80 due to coding limiations
  */
-uint8_t bno055_setInterruptNoSlowMotion(
-      uint8_t noSlowMotion,
+uint8_t bno055_setInterruptNoOrSlowMotion(
+      uint8_t noOrSlowMotion,
       uint16_t parameter
     ) {
   uint8_t byte = 0;
 
-  if (noSlowMotion == 0) {
-    if (parameter < 1) {
-      return 1;
-    } else if (parameter < 20) {
-      byte = ((parameter - 1) & 0x0F) << 1;
-    } else if (parameter < 88) {
-      byte = (((parameter - 20)/4) & 0x0F) << 1;
-      byte |= 0x20;
-    } else if (parameter < 337) {
-      byte = ((parameter - 88)/8) << 1;
-      byte |= 0x40;
-    } else {
-      return 2;
-    }
-    byte |= 0x01;
-  } else if (noSlowMotion == 1) {
-    if (parameter > 63) { return 3; }
-    byte = parameter << 1;
-  } else {
-    return 4;
+  switch (noOrSlowMotion) {
+    case 0:
+      if (parameter < 1) {
+        return 1;
+      } else if (parameter < 20) {
+        byte = ((parameter - 1) & 0x0F) << 1;
+      } else if (parameter < 88) {
+        byte = (((parameter - 20)/4) & 0x0F) << 1;
+        byte |= 0x20;
+      } else if (parameter < 337) {
+        byte = ((parameter - 88)/8) << 1;
+        byte |= 0x40;
+      } else {
+        return 2;
+      }
+      byte |= 0x01;
+      break;
+    case 1:
+      if (parameter > 63) {
+        return 3;
+      }
+      byte = parameter << 1;
+      break;
+    default:
+      return 4;
   }
 
   bno055_setPage(1);
