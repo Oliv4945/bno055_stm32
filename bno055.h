@@ -182,6 +182,12 @@ typedef enum {  // BNO-55 operation modes
   BNO055_OPERATION_MODE_NDOF  // 0x0C
 } bno055_opmode_t;
 
+typedef enum  {
+  BNO055_POWER_MODE_NORMAL = 0x00,
+  BNO055_POWER_MODE_LOW_POWER = 0x01,
+  BNO055_POWER_MODE_SUSPEND = 0x02
+} bno055_power_mode_t;
+
 typedef struct {
   uint8_t mcuState;
   uint8_t gyrState;
@@ -259,10 +265,8 @@ void bno055_setOperationModeNDOF();
 void bno055_enableExternalCrystal();
 void bno055_disableExternalCrystal();
 void bno055_setup();
-uint8_t bno055_getInterruptEnable();
-void bno055_setInterruptEnable(uint8_t byte);
-uint8_t bno055_getInterruptMask();
-void bno055_setInterruptMask(uint8_t mask);
+void bno055_setPowerMode(bno055_power_mode_t mode);
+bno055_power_mode_t bno055_getPowerMode();
 
 int8_t bno055_getTemp();
 

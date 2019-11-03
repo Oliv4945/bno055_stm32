@@ -108,6 +108,19 @@ void bno055_setup() {
   bno055_delay(10);
 }
 
+void bno055_setPowerMode(bno055_power_mode_t mode) {
+  bno055_setPage(0);
+  bno055_writeData(BNO055_PWR_MODE, mode);
+}
+
+bno055_power_mode_t bno055_getPowerMode() {
+  bno055_power_mode_t mode;
+  bno055_setPage(0);
+  bno055_readData(BNO055_PWR_MODE, &mode, 1);
+  mode &= 0x03;
+  return mode;
+}
+
 int16_t bno055_getSWRevision() {
   bno055_setPage(0);
   uint8_t buffer[2];
