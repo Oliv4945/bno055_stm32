@@ -109,6 +109,10 @@ void bno055_setup() {
 }
 
 void bno055_setPowerMode(bno055_power_mode_t mode) {
+  // BNO055 should be in config mode, It is not written
+  // in datasheet v1.4 but in the drivers:
+  // https://github.com/BoschSensortec/BNO055_driver/blob/master/bno055.c#L7528
+  bno055_setOperationMode(BNO055_OPERATION_MODE_CONFIG);
   bno055_setPage(0);
   bno055_writeData(BNO055_PWR_MODE, mode);
 }
